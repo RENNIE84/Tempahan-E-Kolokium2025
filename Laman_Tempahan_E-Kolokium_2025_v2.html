@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tempahan Slot Rakaman E-Kolokium 2025</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f6f9; padding: 20px; }
+    h1 { text-align: center; color: #2c3e50; }
+    .logo-container { text-align: center; margin-bottom: 10px; }
+    .logo-container img { height: 120px; width: auto; }
+    .login-container, .app-container {
+      max-width: 900px; margin: auto; background: #fff; padding: 20px;
+      border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .login-container { text-align: center; margin-top: 100px; }
+    .slot {
+      display: inline-block; width: 150px; height: 50px; margin: 5px;
+      text-align: center; border-radius: 8px; border: 1px solid #ccc;
+      line-height: 50px; cursor: pointer; background-color: #e8f0fe;
+    }
+    .slot.booked { background-color: #a5d6a7; color: white; }
+    .slot.break { background-color: #fdd835; color: #333; cursor: not-allowed; }
+    #bookingForm { display: none; margin-top: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background-color: #4CAF50; color: white; }
+    button {
+      padding: 8px 14px; border: none; border-radius: 6px;
+      background-color: #4CAF50; color: white; cursor: pointer; margin: 5px;
+    }
+    button:hover { background-color: #45a049; }
+    #logoutBtn { background-color: #e74c3c; }
+  </style>
+</head>
+<body>
+
+<!-- Login -->
+<div class="login-container" id="loginContainer">
+  <h2>Log Masuk Guru</h2>
+  <p>Sila masukkan kata laluan untuk mengakses sistem tempahan.</p>
+  <input type="password" id="passwordInput" placeholder="Kata Laluan">
+  <br><br>
+  <button onclick="checkPassword()">Log Masuk</button>
+  <p id="loginMessage" style="color:red;"></p>
+</div>
+
+<!-- Aplikasi utama -->
+<div class="app-container" id="appContainer" style="display:none;">
+  <div class="logo-container">
+    <img src="SMKL.png" alt="Logo SMK Lundu">
+  </div>
+  <h1>Tempahan Slot Rakaman E-Kolokium 2025</h1>
+
+  <label for="date">Pilih Tarikh: </label>
+  <input type="date" id="date">
+  <button id="showReport">Laporan Hari Ini</button>
+  <button id="printReport">Cetak Laporan Hari Ini</button>
+  <button id="clearDay">Padam Semua Hari Ini</button>
+  <button id="logoutBtn" onclick="logout()">Log Keluar</button>
+
+  <div id="slots"></div>
+
+  <div id="bookingForm">
+    <h3>Tempahan Slot</h3>
+    <input type="text" id="teacherName" placeholder="Nama Guru"><br>
+    <input type="text" id="className" placeholder="Kelas / Unit"><br>
+    <input type="text" id="presentationTitle" placeholder="Tajuk Pembentangan"><br>
+    <button onclick="saveBooking()">Simpan</button>
+    <button onclick="deleteBooking()">Padam</button>
+    <button onclick="cancelForm()">Batal</button>
+  </div>
+
+  <div id="report"></div>
+</div>
+
+<!-- Skrip -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const PASSWORD = "YEE@1401";
+let currentSlot = null;
+
+function checkPassword() {
+  const input = document.getElementById("passwordInput").value;
+  if (input === PASSWORD) {
+    document.getElementById("loginContainer").style.display = "none";
+    document.getElementById("appContainer").style.display = "block";
+  } else {
+    document.getElementById("loginMessage").textContent = "Kata laluan salah!";
+  }
+}
+
+function logout() {
+  document.getElementById("appContainer").style.display = "none";
+  document.getElementById("loginContainer").style.display = "block";
+  document.getElementById("passwordInput").value = "";
+}
+
+const slotsDiv = document.getElementById("slots");
+const bookingForm = document.getElementById("bookingForm");
+const reportDiv = document.getElementById("report");
+const dateInput = document.getElementById("date");
+
+const startTime = 7 * 60;
+const totalSlots = 18;
+const slotDuration = 30;
+
+function renderSlots() {
+  slotsDiv.innerHTML = "";
+  for (let i = 0; i < totalSlots; i++) {
+    const minutes = startTime + i * slotDuration;
+    const hour = Math.floor(minutes / 60);
+    const min = minutes % 60;
+    const timeLabel = `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+
+    if (timeLabel === "10:00") {
+      const brk = document.createElement("div");
+      brk.className = "slot break";
+      brk.textContent = "Rehat (10:00 - 10:30)";
+      slotsDiv.appendChild(brk);
+      continue;
+    }
+
+    const slot = document.createElement("div");
+    slot.className = "slot";
+    slot.dataset.time = timeLabel;
+    slot.textContent = timeLabel;
+    slot.onclick = () => selectSlot(slot);
+    slotsDiv.appendChild(slot);
+  }
+}
+
+function selectSlot(slot) {
+  if (slot.classList.contains("break")) return;
+  currentSlot = slot;
+  const selectedDate = dateInput.value;
+  if (!selectedDate) { alert("Sila pilih tarikh terlebih dahulu."); return; }
+
+  const bookings = getBookings(selectedDate);
+  const existing = bookings.find(b => b.time === slot.dataset.time);
+
+  if (existing) {
+    document.getElementById("teacherName").value = existing.name;
+    document.getElementById("className").value = existing.class;
+    document.getElementById("presentationTitle").value = existing.title;
+  } else {
+    document.getElementById("teacherName").value = "";
+    document.getElementById("className").value = "";
+    document.getElementById("presentationTitle").value = "";
+  }
+
+  bookingForm.style.display = "block";
+}
+
+function cancelForm() { bookingForm.style.display = "none"; }
+
+function getBookings(date) {
+  return JSON.parse(localStorage.getItem("bookings_" + date) || "[]");
+}
+
+function saveBookings(date, bookings) {
+  localStorage.setItem("bookings_" + date, JSON.stringify(bookings));
+}
+
+function saveBooking() {
+  const name = document.getElementById("teacherName").value.trim();
+  const cls = document.getElementById("className").value.trim();
+  const title = document.getElementById("presentationTitle").value.trim();
+  if (!name || !cls || !title) { alert("Sila isi semua maklumat."); return; }
+
+  const date = dateInput.value;
+  let bookings = getBookings(date);
+  const existing = bookings.find(b => b.time === currentSlot.dataset.time);
+  if (existing) {
+    existing.name = name;
+    existing.class = cls;
+    existing.title = title;
+  } else {
+    if (bookings.some(b => b.name === name)) {
+      alert("Guru ini sudah mempunyai tempahan pada masa lain hari ini!");
+      return;
+    }
+    bookings.push({ time: currentSlot.dataset.time, name, class: cls, title });
+  }
+  saveBookings(date, bookings);
+  renderReport();
+  bookingForm.style.display = "none";
+  renderSlots();
+  colorBookedSlots();
+}
+
+function deleteBooking() {
+  const date = dateInput.value;
+  let bookings = getBookings(date).filter(b => b.time !== currentSlot.dataset.time);
+  saveBookings(date, bookings);
+  renderReport();
+  bookingForm.style.display = "none";
+  renderSlots();
+  colorBookedSlots();
+}
+
+function colorBookedSlots() {
+  const date = dateInput.value;
+  if (!date) return;
+  const bookings = getBookings(date);
+  document.querySelectorAll(".slot").forEach(slot => {
+    slot.classList.remove("booked");
+    if (bookings.some(b => b.time === slot.dataset.time)) {
+      slot.classList.add("booked");
+    }
+  });
+}
+
+function renderReport() {
+  const date = dateInput.value;
+  const bookings = getBookings(date);
+  if (!date) return;
+
+  let html = `<h3>Laporan Tempahan (${date})</h3><table><tr><th>Masa</th><th>Nama Guru</th><th>Kelas/Unit</th><th>Tajuk</th></tr>`;
+  bookings.sort((a,b) => a.time.localeCompare(b.time));
+  bookings.forEach(b => {
+    html += `<tr><td>${b.time}</td><td>${b.name}</td><td>${b.class}</td><td>${b.title}</td></tr>`;
+  });
+  html += "</table>";
+  html += '<button id="exportExcel" onclick="exportToExcel()">Eksport ke Excel</button>';
+  reportDiv.innerHTML = html;
+  colorBookedSlots();
+}
+
+document.getElementById("showReport").onclick = renderReport;
+
+document.getElementById("printReport").onclick = function() {
+  const content = reportDiv.innerHTML;
+  const w = window.open();
+  w.document.write("<html><head><title>Cetak Laporan</title></head><body>" + content + "</body></html>");
+  w.print();
+  w.close();
+};
+
+document.getElementById("clearDay").onclick = function() {
+  const date = dateInput.value;
+  if (!date) { alert("Sila pilih tarikh dahulu."); return; }
+  if (confirm("Padam semua tempahan hari ini?")) {
+    localStorage.removeItem("bookings_" + date);
+    renderSlots();
+    reportDiv.innerHTML = "";
+  }
+};
+
+dateInput.onchange = function() { renderSlots(); renderReport(); };
+
+function exportToExcel() {
+  const date = dateInput.value;
+  const bookings = getBookings(date);
+  if (bookings.length === 0) { alert("Tiada data untuk dieksport."); return; }
+
+  const ws_data = [["Tarikh", "Masa", "Nama Guru", "Kelas/Unit", "Tajuk Pembentangan"]];
+  bookings.forEach(b => {
+    ws_data.push([date, b.time, b.name, b.class, b.title]);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+  XLSX.utils.book_append_sheet(wb, ws, "Laporan");
+  XLSX.writeFile(wb, `Laporan_E-Kolokium_${date}.xlsx`);
+}
+
+renderSlots();
+</script>
+</body>
+</html>
