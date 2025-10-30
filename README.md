@@ -1,5 +1,4 @@
 
-<!DOCTYPE html>
 <html lang="ms">
 <head>
   <meta charset="utf-8">
